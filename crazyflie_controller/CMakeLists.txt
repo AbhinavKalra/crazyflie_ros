@@ -1,9 +1,14 @@
+
 cmake_minimum_required(VERSION 2.8.3)
 project(crazyflie_controller)
-
+add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf
+)
+
+find_package(crazyflie_driver REQUIRED COMPONENTS
+  Position
 )
 
 ## System dependencies are found with CMake's conventions
@@ -89,7 +94,8 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-  ${catkin_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS},
+  ${crazyflie_driver_INCLUDE_DIRS}
 )
 
 ## Declare a cpp library
@@ -98,15 +104,60 @@ include_directories(
 # )
 
 # Declare a cpp executable
-add_executable(crazyflie_controller
-  src/controller.cpp)
+add_executable(	
+	crazyflie_controller
+  	src/controller.cpp
+   	)
+
+target_link_libraries(crazyflie_controller
+  ${catkin_LIBRARIES}
+)
+
+add_executable(newController src/newController.cpp)	 
+   	            #########################################
+
+# Add cmake target dependencies of the executable/library
+# as an example, message headers may need to be generated before nodes
+# add_dependencies(crazyflie_controller crazyflie_controller_generate_messages_cpp)
+add_dependencies(newController
+  crazyflie_driver_generate_messages_cpp
+)
+
+# Specify libraries to link a library or executable target against
+target_link_libraries(newController
+  ${catkin_LIBRARIES}
+)
+
+
+
+add_executable(followerController src/followerController.cpp)  
+                #########################################
+
+# Add cmake target dependencies of the executable/library
+# as an example, message headers may need to be generated before nodes
+# add_dependencies(crazyflie_controller crazyflie_controller_generate_messages_cpp)
+add_dependencies(followerController
+  crazyflie_driver_generate_messages_cpp
+)
+
+# Specify libraries to link a library or executable target against
+target_link_libraries(followerController
+  ${catkin_LIBRARIES}
+)
+
+
+
+add_executable(graph src/graph.cpp)	 
+   	            #########################################
 
 # Add cmake target dependencies of the executable/library
 # as an example, message headers may need to be generated before nodes
 # add_dependencies(crazyflie_controller crazyflie_controller_generate_messages_cpp)
 
+
+
 # Specify libraries to link a library or executable target against
-target_link_libraries(crazyflie_controller
+target_link_libraries(graph
   ${catkin_LIBRARIES}
 )
 
@@ -132,11 +183,11 @@ target_link_libraries(crazyflie_controller
 # )
 
 ## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h"   
+  PATTERN ".svn" EXCLUDE 
+)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES

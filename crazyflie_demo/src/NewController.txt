@@ -1,0 +1,2 @@
+1. Listen to m_goal and publish to cmd_position //// intercept in crazyflie firmware
+	has port 0x07

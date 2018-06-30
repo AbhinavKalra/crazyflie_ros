@@ -27,6 +27,8 @@ public:
     {
     }
 
+    PID(){};
+
     void reset()
     {
         m_integral = 0;
@@ -66,6 +68,7 @@ public:
         // self.pubP.publish(p)
         // self.pubD.publish(d)
         // self.pubI.publish(i)
+        /*std::cout<<"chutiya hai nalawade sarvesh bharat bhosdiwala. usse bada chutiya bhaskar mitra. dono ki gaand mai hathoda"<<std::endl;*/
         return std::max(std::min(output, m_maxOutput), m_minOutput);
     }
 

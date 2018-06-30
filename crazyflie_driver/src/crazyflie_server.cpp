@@ -125,6 +125,7 @@ public:
     , m_subscribeCmdHover()
     , m_subscribeCmdStop()
     , m_subscribeCmdPosition()
+    , m_subscribeCmdNeighbourPosition()
     , m_subscribeExternalPosition()
     , m_pubImu()
     , m_pubTemp()
@@ -270,6 +271,23 @@ void cmdPositionSetpoint(
     }
   }
 
+
+void cmdNeighbourPositionSetpoint(
+    const crazyflie_driver::Position::ConstPtr& msg)
+  {
+    if(!m_isEmergency) {
+      float x = msg->x;
+      float y = msg->y;
+      float z = msg->z;
+      float yaw = msg->yaw;
+
+      m_cf.sendNeighbourPositionSetpoint(x, y, z, yaw);
+      m_sentSetpoint = true;
+    }
+  }
+
+
+
   bool updateParams(
     crazyflie_driver::UpdateParams::Request& req,
     crazyflie_driver::UpdateParams::Response& res)
@@ -382,6 +400,7 @@ void cmdPositionSetpoint(
     m_subscribeCmdHover = n.subscribe(m_tf_prefix + "/cmd_hover", 1, &CrazyflieROS::cmdHoverSetpoint, this);
     m_subscribeCmdStop = n.subscribe(m_tf_prefix + "/cmd_stop", 1, &CrazyflieROS::cmdStop, this);
     m_subscribeCmdPosition = n.subscribe(m_tf_prefix + "/cmd_position", 1, &CrazyflieROS::cmdPositionSetpoint, this);
+    m_subscribeCmdNeighbourPosition = n.subscribe(m_tf_prefix + "/cmd_neighbour_position", 1, &CrazyflieROS::cmdNeighbourPositionSetpoint, this);
 
 
     m_serviceSetGroupMask = n.advertiseService(m_tf_prefix + "/set_group_mask", &CrazyflieROS::setGroupMask, this);
@@ -794,6 +813,7 @@ private:
   ros::Subscriber m_subscribeCmdHover;
   ros::Subscriber m_subscribeCmdStop;
   ros::Subscriber m_subscribeCmdPosition;
+  ros::Subscriber m_subscribeCmdNeighbourPosition;
   ros::Subscriber m_subscribeExternalPosition;
   ros::Publisher m_pubImu;
   ros::Publisher m_pubTemp;
@@ -843,7 +863,7 @@ public:
 
 private:
 
-  bool add_crazyflie(
+  bool add_crazyflie(                                 /////////////adds a crazyflie
     crazyflie_driver::AddCrazyflie::Request  &req,
     crazyflie_driver::AddCrazyflie::Response &res)
   {
@@ -883,7 +903,7 @@ private:
     return true;
   }
 
-  bool remove_crazyflie(
+  bool remove_crazyflie(                                     ///////////// Removes the crazyflie
     crazyflie_driver::RemoveCrazyflie::Request  &req,
     crazyflie_driver::RemoveCrazyflie::Response &res)
   {

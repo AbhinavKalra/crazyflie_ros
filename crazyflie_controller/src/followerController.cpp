@@ -3,6 +3,9 @@
 #include <std_srvs/Empty.h>
 #include <geometry_msgs/Twist.h>
 #include "pid.hpp"
+#include "crazyflie_driver/Position.h"
+#include <geometry_msgs/PointStamped.h>
+
 
 double get(
     const ros::NodeHandle& n,
@@ -23,43 +26,9 @@ public:
         : m_worldFrame(worldFrame)
         , m_frame(frame)
         , m_pubNav()
+        , m_pubNeighbourPosition()
+        , m_pubCurrentPosition()
         , m_listener()
-        , m_pidX(
-            get(n, "PIDs/X/kp"),
-            get(n, "PIDs/X/kd"),
-            get(n, "PIDs/X/ki"),
-            get(n, "PIDs/X/minOutput"),
-            get(n, "PIDs/X/maxOutput"),
-            get(n, "PIDs/X/integratorMin"),
-            get(n, "PIDs/X/integratorMax"),
-            "x")
-        , m_pidY(
-            get(n, "PIDs/Y/kp"),
-            get(n, "PIDs/Y/kd"),
-            get(n, "PIDs/Y/ki"),
-            get(n, "PIDs/Y/minOutput"),
-            get(n, "PIDs/Y/maxOutput"),
-            get(n, "PIDs/Y/integratorMin"),
-            get(n, "PIDs/Y/integratorMax"),
-            "y")
-        , m_pidZ(
-            get(n, "PIDs/Z/kp"),
-            get(n, "PIDs/Z/kd"),
-            get(n, "PIDs/Z/ki"),
-            get(n, "PIDs/Z/minOutput"),
-            get(n, "PIDs/Z/maxOutput"),
-            get(n, "PIDs/Z/integratorMin"),
-            get(n, "PIDs/Z/integratorMax"),
-            "z")
-        , m_pidYaw(
-            get(n, "PIDs/Yaw/kp"),
-            get(n, "PIDs/Yaw/kd"),
-            get(n, "PIDs/Yaw/ki"),
-            get(n, "PIDs/Yaw/minOutput"),
-            get(n, "PIDs/Yaw/maxOutput"),
-            get(n, "PIDs/Yaw/integratorMin"),
-            get(n, "PIDs/Yaw/integratorMax"),
-            "yaw")
         , m_state(Idle)
         , m_goal()
         , m_subscribeGoal()
@@ -73,7 +42,9 @@ public:
     {
         ros::NodeHandle nh;
         m_listener.waitForTransform(m_worldFrame, m_frame, ros::Time(0), ros::Duration(10.0)); 
-        m_pubNav = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+        m_pubNav = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1); 
+        m_pubCurrentPosition = nh.advertise<geometry_msgs::PointStamped>("external_position",1);
+        m_pubNeighbourPosition = nh.advertise<crazyflie_driver::Position>("cmd_neighbour_position",1);
         m_subscribeGoal = nh.subscribe("goal", 1, &Controller::goalChanged, this);
         m_serviceTakeoff = nh.advertiseService("takeoff", &Controller::takeoff, this);
         m_serviceLand = nh.advertiseService("land", &Controller::land, this);
@@ -127,14 +98,6 @@ private:
         m_listener.lookupTransform(sourceFrame, targetFrame, ros::Time(0), result);
     }
 
-    void pidReset()
-    {
-        m_pidX.reset();
-        m_pidY.reset();
-        m_pidZ.reset();
-        m_pidYaw.reset();
-    }
-
     void iteration(const ros::TimerEvent& e)
     {
         float dt = e.current_real.toSec() - e.last_real.toSec();
@@ -143,13 +106,10 @@ private:
         {
         case TakingOff:
             {
-                std::cout<<m_frame<<"--------------taking off bitch"<<std::endl;
                 tf::StampedTransform transform;
                 m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
-                if (transform.getOrigin().z() > m_startZ + 0.05 || m_thrust > 50000)    /////////
+                if (transform.getOrigin().z() > m_startZ + 0.05 || m_thrust > 50000)    
                 {
-                    pidReset();
-                    m_pidZ.setIntegral(m_thrust / m_pidZ.ki());
                     m_state = Automatic;
                     m_thrust = 0;
                 }
@@ -160,8 +120,6 @@ private:
                     msg.linear.z = m_thrust;
                     msg.linear.y = 0;
                     msg.linear.x = 0;
-                    //msg.angular.x = 0;
-                    //msg.angular.y = 0;
                     msg.angular.z = 0;
                     m_pubNav.publish(msg);
                 }
@@ -182,63 +140,27 @@ private:
             // intentional fall-thru
         case Automatic:
             {
-                std::cout<<m_frame<<" Automatic     -----------------------"<<std::endl;
                 tf::StampedTransform transform;
                 m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
-                geometry_msgs::PoseStamped targetWorld;
-                targetWorld.header.stamp = transform.stamp_;
-                targetWorld.header.frame_id = m_worldFrame;
-                targetWorld.pose = m_goal.pose;
-
-                geometry_msgs::PoseStamped targetDrone;
-                //std::cout<<"---------------------------------NO ERROR 1 -------------------------------------------------"<<std::endl;
-                //std::cout<<"---------------------------------NO ERROR 1 -------------------------------------------------"<<std::endl;
-       /*         m_listener.transformPose(m_frame, targetWorld, targetDrone);*/
-                //std::cout<<"---------------------------------NO ERROR 2 -------------------------------------------------"<<std::endl;
-              /*  tfScalar roll, pitch, yaw;
-                roll=0;yaw = 0; pitch = 0;
-                tf::Matrix3x3(
-                    tf::Quaternion(
-                        targetDrone.pose.orientation.x,
-                        targetDrone.pose.orientation.y,
-                        targetDrone.pose.orientation.z,
-                        targetDrone.pose.orientation.w
-                    )).getRPY(roll, pitch, yaw);*/
-                //std::cout<<"---------------------------------NO ERROR 3 -------------------------------------------------"<<std::endl;
+                geometry_msgs::PointStamped current_position_msg;
+                crazyflie_driver::Position neighbour_position_msg;
+                current_position_msg.point.x = transform.getOrigin().x();
+                current_position_msg.point.y = transform.getOrigin().y();
+                current_position_msg.point.z = transform.getOrigin().z();
+                m_pubCurrentPosition.publish(current_position_msg);                 // current position published
                 
-                geometry_msgs::Twist msg;
-                
-                float x,y,z;
-                //x= m_goal.pose.position.x-transform.getOrigin().x();
-                //y= m_goal.pose.position.y-transform.getOrigin().y();
-                //z= m_goal.pose.position.z-transform.getOrigin().z();
-
-                z= m_goal.pose.position.z-transform.getOrigin().z();
-                y= m_startY-transform.getOrigin().y();
-                x= m_startX-transform.getOrigin().x();                
-
-                msg.linear.x = -1*m_pidX.update(0,x);
-                //std::cout<<targetDrone.pose.position.x<<"  "<<transform.getOrigin().x()<<"        ";
-                msg.linear.y = -1*m_pidY.update(0,y);
-                //std::cout<<targetDrone.pose.position.y<<"  "<<transform.getOrigin().y()<<"        ";
-                msg.linear.z = m_pidZ.update(0,z);
-                //std::cout<<targetDrone.pose.position.z<<"  "<<transform.getOrigin().z()<<std::endl;
-                msg.angular.z = m_pidYaw.update(0.0, 0);
-                //std::cout<<msg.linear.x << "  " << msg.linear.y << "  " << msg.linear.z << std::endl;
-                m_pubNav.publish(msg);
-               // std::cout<<targetDrone.pose.position.x<<"    "<<transform.getOrigin().x()<<std::endl;
+                m_listener.lookupTransform(m_worldFrame, "crazyflie0", ros::Time(0), transform);
+                neighbour_position_msg.x = transform.getOrigin().x();
+                neighbour_position_msg.y = transform.getOrigin().y();
+                neighbour_position_msg.z = transform.getOrigin().z();
+                neighbour_position_msg.yaw=0;
+                m_pubNeighbourPosition.publish(neighbour_position_msg);
             }
             break;
         case Idle:
             {
                 geometry_msgs::Twist msg;
                 m_pubNav.publish(msg);
-                /*tf::StampedTransform transform;
-                m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
-                std::cout<<transform.getOrigin().getX()<<"        ";
-                std::cout<<transform.getOrigin().getY()<<"        ";
-                std::cout<<transform.getOrigin().getZ()<<std::endl;*/
-
             }
             break;
         }
@@ -258,11 +180,9 @@ private:
     std::string m_worldFrame;
     std::string m_frame;
     ros::Publisher m_pubNav;
+    ros::Publisher m_pubNeighbourPosition;
+    ros::Publisher m_pubCurrentPosition;
     tf::TransformListener m_listener;
-    PID m_pidX;
-    PID m_pidY;
-    PID m_pidZ;
-    PID m_pidYaw;
     State m_state;
     geometry_msgs::PoseStamped m_goal;
     ros::Subscriber m_subscribeGoal;
@@ -276,7 +196,7 @@ private:
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "controller");
+  ros::init(argc, argv, "followerController");
 
   // Read parameters
   ros::NodeHandle n("~");

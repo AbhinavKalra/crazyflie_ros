@@ -3,7 +3,7 @@
 import rospy
 import tf
 from crazyflie_driver.msg import Position
-from std_msgs.msg import Empty
+from crazyflie_driver.msg import Stop
 from crazyflie_driver.srv import UpdateParams
 
 if __name__ == '__main__':
@@ -24,8 +24,11 @@ if __name__ == '__main__':
 
     pub = rospy.Publisher(name, Position, queue_size=1)
 
-    stop_pub = rospy.Publisher("cmd_stop", Empty, queue_size=1)
-    stop_msg = Empty()
+    stop_pub = rospy.Publisher("cmd_stop", Stop, queue_size=1)
+    stop_msg = Stop()
+    stop_msg.header.seq = 0
+    stop_msg.header.stamp = rospy.Time.now()
+    stop_msg.header.frame_id = worldFrame
 
     rospy.wait_for_service('update_params')
     rospy.loginfo("found update_params service")
